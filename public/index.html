@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Recipe Genie</title>
+<style>
+:root{--bg:#f5faff;--panel:#fff;--ink:#1c3350;--muted:#6b829c;--accent:#4a9eea;--accent-d:#2f84d4;--tint:#e8f3fe;--line:#d9e9fa;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1c2c;--panel:#162a40;--ink:#e6f0fb;--muted:#92a9c2;--tint:#1d3752;--line:#264261}}
+:root[data-theme="dark"]{--bg:#0f1c2c;--panel:#162a40;--ink:#e6f0fb;--muted:#92a9c2;--tint:#1d3752;--line:#264261}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:780px;margin:0 auto;padding:40px 18px 32px}
+header{text-align:center;margin-bottom:26px}
+header h1{margin:0;font-size:30px;font-weight:300;letter-spacing:.5px}
+header h1 b{font-weight:600;color:var(--accent)}
+header p{margin:6px 0 0;color:var(--muted);font-size:14px}
+form{display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px;box-shadow:0 2px 10px rgba(74,158,234,.12)}
+input[type=text]{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;padding:8px 14px}
+input[type=text]:focus{outline:none}
+form:focus-within{border-color:var(--accent)}
+button{cursor:pointer;font:inherit;font-weight:500;color:#fff;background:var(--accent);border:0;border-radius:999px;padding:8px 20px;transition:background .15s}
+button:hover{background:var(--accent-d)}
+button:focus-visible{outline:2px solid var(--accent-d);outline-offset:2px}
+.status{margin:18px 4px 12px;font-size:13px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-align:center;padding-bottom:14px}
+.card .pic{height:110px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--tint)}
+.card .pic img{width:100%;height:100%;object-fit:cover}
+.card h3{margin:12px 12px 10px;font-size:14px;font-weight:500;min-height:42px}
+.card button{background:var(--tint);color:var(--accent-d);padding:6px 16px;font-size:13px}
+.card button:hover{background:var(--accent);color:#fff}
+.modal{position:fixed;inset:0;background:rgba(28,51,80,.35);display:none;align-items:flex-start;justify-content:center;padding:28px 14px;overflow:auto;z-index:5}
+.modal.on{display:flex}
+.win{background:var(--panel);width:100%;max-width:540px;border-radius:16px;box-shadow:0 12px 40px rgba(28,51,80,.25);overflow:hidden}
+.title{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);font-weight:600;font-size:17px}
+.title button{background:var(--tint);color:var(--accent-d);width:30px;height:30px;padding:0;line-height:30px}
+.body{padding:6px 20px 20px}
+.body h4{margin:18px 0 6px;color:var(--accent-d);font-size:13px;font-weight:600}
+.body ul,.body ol{margin:0;padding-left:20px}
+.body li{margin-bottom:4px}
+.meta{font-size:13px;color:var(--muted);margin:12px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>Recipe <b>Genie</b></h1><p>Find something good to cook.</p></header>
+
+<form id="f"><input type="text" id="q" placeholder="Search recipes, e.g. pasta" aria-label="Search recipes"><button type="submit">Search</button></form>
+<div class="status" id="status">Showing sample recipes.</div>
+<div class="grid" id="grid"></div>
+
+</div>
+
+<div class="modal" id="m" role="dialog" aria-modal="true" aria-labelledby="mt">
+<div class="win"><div class="title"><span id="mt">Recipe</span><button id="x" aria-label="Close">X</button></div><div class="body" id="mb"></div></div>
+</div>
+
+<script>
+// ===== SETTINGS =====
+// false = call YOUR proxy (which holds the Spoonacular key). true = use sample data.
+const USE_MOCK = false;
+const API_BASE = "/api"; // your proxy: /api/search?query=... and /api/recipe/:id
+
+// ===== SAMPLE DATA (same shape as Spoonacular's responses) =====
+const MOCK = [
+ {id:1,title:"Spaghetti Aglio e Olio",emoji:"🍝",readyInMinutes:20,servings:2,extendedIngredients:[{original:"200g spaghetti"},{original:"4 cloves garlic, sliced"},{original:"1/4 cup olive oil"},{original:"Chili flakes, parsley, salt"}],instructions:"Boil the pasta until al dente. Gently warm garlic and chili in olive oil. Toss pasta with the oil and a splash of pasta water. Top with parsley."},
+ {id:2,title:"Chocolate Chip Cookies",emoji:"🍪",readyInMinutes:30,servings:12,extendedIngredients:[{original:"2 1/4 cups flour"},{original:"1 cup butter, softened"},{original:"3/4 cup each white and brown sugar"},{original:"2 eggs"},{original:"2 cups chocolate chips"}],instructions:"Cream butter and sugars. Beat in eggs. Mix in flour and chips. Drop spoonfuls onto a tray. Bake at 375F for 10 minutes."},
+ {id:3,title:"Lemon Herb Chicken",emoji:"🍗",readyInMinutes:45,servings:4,extendedIngredients:[{original:"4 chicken thighs"},{original:"2 lemons"},{original:"3 tbsp olive oil"},{original:"Thyme, garlic, salt, pepper"}],instructions:"Marinate chicken in lemon, oil, and herbs for 20 minutes. Roast at 425F for 25 minutes until golden."},
+ {id:4,title:"Tomato Basil Soup",emoji:"🍅",readyInMinutes:35,servings:4,extendedIngredients:[{original:"1 can crushed tomatoes"},{original:"1 onion, diced"},{original:"2 cups vegetable broth"},{original:"Fresh basil, cream"}],instructions:"Soften the onion. Add tomatoes and broth and simmer 20 minutes. Blend with basil and stir in a little cream."}
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function searchRecipes(query){
+  if (USE_MOCK) {
+    const q = query.toLowerCase();
+    return MOCK.filter(r => !q || r.title.toLowerCase().includes(q));
+  }
+  const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error("Search failed");
+  return (await res.json()).results || [];
+}
+async function getRecipe(id){
+  if (USE_MOCK) return MOCK.find(r => r.id === id);
+  const res = await fetch(`${API_BASE}/recipe/${id}`);
+  if (!res.ok) throw new Error("Recipe failed");
+  return res.json();
+}
+
+function render(list){
+  $("grid").innerHTML = list.map(r => `
+    <div class="card">
+      <div class="pic">${r.image ? `<img src="${esc(r.image)}" alt="">` : (r.emoji || "🍽️")}</div>
+      <h3>${esc(r.title)}</h3>
+      <button data-id="${r.id}">View recipe</button>
+    </div>`).join("");
+}
+
+async function run(query){
+  $("status").textContent = "Loading...";
+  try {
+    const list = await searchRecipes(query);
+    $("status").textContent = list.length ? `Found ${list.length} recipe${list.length>1?"s":""}.` : "No recipes found. Try a different search.";
+    render(list);
+  } catch(e){ $("status").textContent = "Could not reach the recipe server. Check that your proxy is running."; $("grid").innerHTML = ""; }
+}
+
+async function openRecipe(id){
+  $("mt").textContent = "Loading...";
+  $("mb").innerHTML = "<p>One moment...</p>";
+  $("m").classList.add("on");
+  try {
+    const r = await getRecipe(id);
+    $("mt").textContent = r.title;
+    const steps = (r.instructions || "").replace(/<[^>]+>/g," ").split(/(?<=\.)\s+/).filter(Boolean);
+    $("mb").innerHTML = `<p class="meta">Ready in ${esc(r.readyInMinutes)} min · Serves ${esc(r.servings)}</p>
+      <h4>Ingredients</h4><ul>${(r.extendedIngredients||[]).map(i=>`<li>${esc(i.original)}</li>`).join("")}</ul>
+      <h4>Directions</h4><ol>${steps.map(s=>`<li>${esc(s)}</li>`).join("") || "<li>No directions listed.</li>"}</ol>`;
+  } catch(e){ $("mb").innerHTML = "<p>Could not load this recipe.</p>"; }
+}
+
+$("f").addEventListener("submit", e => { e.preventDefault(); run($("q").value.trim()); });
+$("grid").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) openRecipe(Number(b.dataset.id)); });
+$("x").addEventListener("click", () => $("m").classList.remove("on"));
+$("m").addEventListener("click", e => { if (e.target === $("m")) $("m").classList.remove("on"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("m").classList.remove("on"); });
+run("");
+</script>
+</body>
+</html>
